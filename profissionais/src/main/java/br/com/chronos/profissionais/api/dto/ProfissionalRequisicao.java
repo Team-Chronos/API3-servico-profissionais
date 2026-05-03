@@ -8,11 +8,10 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public record ProfissionalRequisicao(
-        @NotBlank @Size(max = 256) String nome,
-        @NotBlank @Email @Size(max = 256) String email,
-        @NotBlank @Size(max = 255) String senhaHash,
-        boolean ativo,
-        int cargoId,
-        List<@Valid ProjetoVinculoRequisicao> projetos
-) {
+                @NotBlank @Size(max = 256) String nome,
+                @NotBlank @Email @Size(max = 256) String email,
+                @Size(max = 255) String senhaHash,
+                boolean ativo,
+                int cargoId,
+                List<@Valid ProjetoVinculoRequisicao> projetos) {
 }

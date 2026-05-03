@@ -31,8 +31,8 @@ public class ProfissionalServico {
     private final ProfissionalProjetoRepositorio profissionalProjetoRepositorio;
 
     public ProfissionalServico(ProfissionalRepositorio profissionalRepositorio,
-                               ProjetoRepositorio projetoRepositorio,
-                               ProfissionalProjetoRepositorio profissionalProjetoRepositorio) {
+            ProjetoRepositorio projetoRepositorio,
+            ProfissionalProjetoRepositorio profissionalProjetoRepositorio) {
         this.profissionalRepositorio = profissionalRepositorio;
         this.projetoRepositorio = projetoRepositorio;
         this.profissionalProjetoRepositorio = profissionalProjetoRepositorio;
@@ -53,7 +53,8 @@ public class ProfissionalServico {
     }
 
     @Transactional
-    @CacheEvict(value = {"profissionais", "profissional", "projetos-disponiveis", "projetos-vinculados"}, allEntries = true)
+    @CacheEvict(value = { "profissionais", "profissional", "projetos-disponiveis",
+            "projetos-vinculados" }, allEntries = true)
     public ProfissionalResposta criar(ProfissionalRequisicao request) {
         if (profissionalRepositorio.existsByEmail(request.email())) {
             throw new IllegalArgumentException("Ja existe profissional com esse email.");
@@ -66,7 +67,8 @@ public class ProfissionalServico {
     }
 
     @Transactional
-    @CacheEvict(value = {"profissionais", "profissional", "projetos-disponiveis", "projetos-vinculados"}, allEntries = true)
+    @CacheEvict(value = { "profissionais", "profissional", "projetos-disponiveis",
+            "projetos-vinculados" }, allEntries = true)
     public ProfissionalResposta atualizar(int id, ProfissionalRequisicao request) {
         Profissional profissional = buscarProfissionalOuFalhar(id);
         if (!profissional.getEmail().equalsIgnoreCase(request.email())
@@ -80,14 +82,14 @@ public class ProfissionalServico {
     }
 
     @Transactional
-    @CacheEvict(value = {"profissionais", "profissional", "projetos-vinculados"}, allEntries = true)
+    @CacheEvict(value = { "profissionais", "profissional", "projetos-vinculados" }, allEntries = true)
     public void deletar(int id) {
         Profissional profissional = buscarProfissionalOuFalhar(id);
         profissionalRepositorio.delete(profissional);
     }
 
     @Transactional
-    @CacheEvict(value = {"profissional", "projetos-vinculados"}, allEntries = true)
+    @CacheEvict(value = { "profissional", "projetos-vinculados" }, allEntries = true)
     public void vincularProjeto(int profissionalId, int projetoId, double valorHora) {
         Profissional profissional = buscarProfissionalOuFalhar(profissionalId);
         Projeto projeto = projetoRepositorio.findById(projetoId)
@@ -102,7 +104,7 @@ public class ProfissionalServico {
     }
 
     @Transactional
-    @CacheEvict(value = {"profissional", "projetos-vinculados"}, allEntries = true)
+    @CacheEvict(value = { "profissional", "projetos-vinculados" }, allEntries = true)
     public void desvincularProjeto(int profissionalId, int projetoId) {
         ProfissionalProjetoId id = new ProfissionalProjetoId(projetoId, profissionalId);
         if (!profissionalProjetoRepositorio.existsById(id)) {
@@ -127,8 +129,7 @@ public class ProfissionalServico {
                         projeto.getId(),
                         projeto.getNome(),
                         projeto.getCodigo(),
-                        projeto.getValorHoraBase().doubleValue()
-                ))
+                        projeto.getValorHoraBase().doubleValue()))
                 .toList();
     }
 
@@ -139,8 +140,7 @@ public class ProfissionalServico {
                         v.getProjeto().getId(),
                         v.getProjeto().getNome(),
                         v.getProjeto().getCodigo(),
-                        v.getValorHora().doubleValue()
-                ))
+                        v.getValorHora().doubleValue()))
                 .toList();
     }
 
@@ -156,20 +156,20 @@ public class ProfissionalServico {
                 profissional.getEmail(),
                 profissional.getAtivo(),
                 profissional.getCargoId(),
-                listarProjetosVinculadosInterno(profissional.getId())
-        );
+                listarProjetosVinculadosInterno(profissional.getId()));
     }
 
     private void preencherDados(Profissional profissional, ProfissionalRequisicao request) {
         profissional.setNome(request.nome());
         profissional.setEmail(request.email());
-        profissional.setSenhaHash(request.senhaHash());
+
         profissional.setAtivo(request.ativo());
         profissional.setCargoId(request.cargoId());
     }
 
     private void sincronizarVinculos(Profissional profissional, List<ProjetoVinculoRequisicao> projetos) {
-        if (projetos == null) return;
+        if (projetos == null)
+            return;
         Set<Integer> projetosProcessados = new HashSet<>();
         profissionalProjetoRepositorio.deletarPorProfissionalId(profissional.getId());
         for (ProjetoVinculoRequisicao projetoVinculo : projetos) {
@@ -177,7 +177,8 @@ public class ProfissionalServico {
                 throw new IllegalArgumentException("Projeto duplicado no cadastro do profissional.");
             }
             Projeto projeto = projetoRepositorio.findById(projetoVinculo.projetoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Projeto nao encontrado: " + projetoVinculo.projetoId()));
+                    .orElseThrow(
+                            () -> new EntityNotFoundException("Projeto nao encontrado: " + projetoVinculo.projetoId()));
             ProfissionalProjeto vinculo = new ProfissionalProjeto();
             vinculo.setId(new ProfissionalProjetoId(projeto.getId(), profissional.getId()));
             vinculo.setProfissional(profissional);
