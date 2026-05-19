@@ -1,10 +1,17 @@
 package br.com.chronos.profissionais.servico;
 
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import br.com.chronos.profissionais.api.dto.ProfissionalRequisicao;
 import br.com.chronos.profissionais.api.dto.ProfissionalResposta;
-import br.com.chronos.profissionais.api.dto.ProjetoResumoResposta;
 import br.com.chronos.profissionais.api.dto.ProjetoVinculoRequisicao;
-import br.com.chronos.profissionais.api.dto.ProjetoVinculadoResposta;
 import br.com.chronos.profissionais.dominio.Profissional;
 import br.com.chronos.profissionais.dominio.ProfissionalProjeto;
 import br.com.chronos.profissionais.dominio.ProfissionalProjetoId;
@@ -13,17 +20,6 @@ import br.com.chronos.profissionais.repositorio.ProfissionalProjetoRepositorio;
 import br.com.chronos.profissionais.repositorio.ProfissionalRepositorio;
 import br.com.chronos.profissionais.repositorio.ProjetoRepositorio;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class ProfissionalServico {
@@ -40,28 +36,6 @@ public class ProfissionalServico {
         this.profissionalProjetoRepositorio = profissionalProjetoRepositorio;
     }
 
-    @Cacheable(value = "profissionais")
-    public List<ProfissionalResposta> listar() {
-        List<Profissional> profissionais = profissionalRepositorio.findAll();
-        if (profissionais.isEmpty()) return List.of();
-
-        List<Integer> ids = profissionais.stream().map(Profissional::getId).toList();
-        Map<Integer, List<ProfissionalProjeto>> vinculosPorProfissional =
-                profissionalProjetoRepositorio.buscarPorProfissionaisComProjeto(ids)
-                        .stream()
-                        .collect(Collectors.groupingBy(pp -> pp.getProfissional().getId()));
-
-        return profissionais.stream()
-                .map(p -> toResponse(p, vinculosPorProfissional.getOrDefault(p.getId(), List.of())))
-                .toList();
-    }
-
-    @Cacheable(value = "profissional", key = "#id")
-    public ProfissionalResposta buscarPorId(int id) {
-        Profissional profissional = buscarProfissionalOuFalhar(id);
-        return toResponse(profissional, listarProjetosVinculadosInterno(id));
-    }
-
     @Transactional
     @CacheEvict(value = { "profissionais", "profissional", "projetos-disponiveis",
             "projetos-vinculados" }, allEntries = true)
@@ -73,7 +47,7 @@ public class ProfissionalServico {
         preencherDados(profissional, request);
         Profissional salvo = profissionalRepositorio.save(profissional);
         sincronizarVinculos(salvo, request.projetos());
-        return toResponse(salvo, listarProjetosVinculadosInterno(salvo.getId()));
+        return buscarResposta(salvo.getId());
     }
 
     @Transactional
@@ -88,7 +62,7 @@ public class ProfissionalServico {
         preencherDados(profissional, request);
         Profissional salvo = profissionalRepositorio.save(profissional);
         sincronizarVinculos(salvo, request.projetos());
-        return toResponse(salvo, listarProjetosVinculadosInterno(salvo.getId()));
+        return buscarResposta(salvo.getId());
     }
 
     @Transactional
@@ -126,53 +100,20 @@ public class ProfissionalServico {
         profissionalProjetoRepositorio.deleteById(id);
     }
 
-    @Cacheable(value = "projetos-vinculados", key = "#profissionalId")
-    @Transactional(readOnly = true)
-    public List<ProjetoVinculadoResposta> listarProjetosVinculados(int profissionalId) {
-        buscarProfissionalOuFalhar(profissionalId);
-        return toProjetoVinculadoResposta(listarProjetosVinculadosInterno(profissionalId));
-    }
-
-    @Cacheable(value = "projetos-disponiveis")
-    @Transactional(readOnly = true)
-    public List<ProjetoResumoResposta> listarProjetosDisponiveis() {
-        return projetoRepositorio.findAll()
-                .stream()
-                .map(projeto -> new ProjetoResumoResposta(
-                        projeto.getId(),
-                        projeto.getNome(),
-                        projeto.getCodigo(),
-                        projeto.getValorHoraBase().doubleValue()))
-                .toList();
-    }
-
-    private List<ProfissionalProjeto> listarProjetosVinculadosInterno(int profissionalId) {
-        return profissionalProjetoRepositorio.buscarPorProfissionalComProjeto(profissionalId);
-    }
-
-    private List<ProjetoVinculadoResposta> toProjetoVinculadoResposta(List<ProfissionalProjeto> vinculos) {
-        return vinculos.stream()
-                .map(v -> new ProjetoVinculadoResposta(
-                        v.getProjeto().getId(),
-                        v.getProjeto().getNome(),
-                        v.getProjeto().getCodigo(),
-                        v.getValorHora().doubleValue()))
-                .toList();
-    }
-
-    private Profissional buscarProfissionalOuFalhar(int id) {
-        return profissionalRepositorio.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Profissional nao encontrado."));
-    }
-
-    private ProfissionalResposta toResponse(Profissional profissional, List<ProfissionalProjeto> vinculos) {
+    private ProfissionalResposta buscarResposta(int id) {
+        Profissional profissional = buscarProfissionalOuFalhar(id);
         return new ProfissionalResposta(
                 profissional.getId(),
                 profissional.getNome(),
                 profissional.getEmail(),
                 profissional.getAtivo(),
                 profissional.getCargoId(),
-                toProjetoVinculadoResposta(vinculos));
+                List.of());
+    }
+
+    private Profissional buscarProfissionalOuFalhar(int id) {
+        return profissionalRepositorio.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Profissional nao encontrado."));
     }
 
     private void preencherDados(Profissional profissional, ProfissionalRequisicao request) {
